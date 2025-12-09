@@ -34,7 +34,7 @@ Implements server‑side pagination and dynamic queries so the app stays fast ev
 ## Setup Instructions  
 
 ### 1. Clone the repository  
-git clone https://github.com/<your-username>/sales-management-system.git
+git clone https://github.com/THULASIRAJANS/sales-management-system.git
 cd sales-management-system
 
 ### 2. Install all dependencies (root, frontend, backend)  

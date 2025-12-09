@@ -134,7 +134,7 @@ const SalesTable = ({ data, loading, pagination, onPageChange }) => {
           onClick={goToPrevious}
           disabled={pagination.currentPage === 1}
         >
-          ‹ Previous
+          ‹
         </button>
 
         {getPageNumbers().map((pageNum, index) => (
@@ -156,7 +156,7 @@ const SalesTable = ({ data, loading, pagination, onPageChange }) => {
           onClick={goToNext}
           disabled={pagination.currentPage === pagination.totalPages}
         >
-          Next ›
+           ›
         </button>
       </div>
 

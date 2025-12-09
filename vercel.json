@@ -2,15 +2,15 @@
   "version": 2,
   "builds": [
     {
-      "src": "api/src/index.js",
-      "use": "@vercel/node"
-    },
-    {
       "src": "frontend/package.json",
       "use": "@vercel/static-build",
       "config": {
         "distDir": "build"
       }
+    },
+    {
+      "src": "api/src/index.js",
+      "use": "@vercel/node"
     }
   ],
   "routes": [
@@ -19,26 +19,8 @@
       "dest": "/api/src/index.js"
     },
     {
-      "src": "/static/(.*)",
-      "dest": "/frontend/build/static/$1"
-    },
-    {
-      "src": "/(.*\\.js|.*\\.css|.*\\.json|.*\\.ico|.*\\.png|.*\\.jpg|.*\\.jpeg|.*\\.svg|.*\\.woff|.*\\.woff2)",
-      "dest": "/frontend/build/$1"
-    },
-    {
       "src": "/(.*)",
       "dest": "/frontend/build/index.html"
-    }
-  ],
-  "rewrites": [
-    {
-      "source": "/api/(.*)",
-      "destination": "/api/src/index.js"
-    },
-    {
-      "source": "/(.*)",
-      "destination": "/frontend/build/index.html"
     }
   ]
 }

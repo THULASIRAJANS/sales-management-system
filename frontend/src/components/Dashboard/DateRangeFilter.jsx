@@ -3,12 +3,9 @@ import '../../styles/DateRangeFilter.css';
 
 const DateRangeFilter = ({ selectedDates, onChange }) => {
   const [isOpen, setIsOpen] = useState(false);
-  const [quickSelect, setQuickSelect] = useState([]);
-  const [showCustomPicker, setShowCustomPicker] = useState(false);
-  
-  const [selectedDay, setSelectedDay] = useState('');
-  const [selectedMonth, setSelectedMonth] = useState('');
-  const [selectedYear, setSelectedYear] = useState('');
+  const [currentDate, setCurrentDate] = useState(new Date());
+  const [selectedDate, setSelectedDate] = useState(null);
+  const [hoveredDate, setHoveredDate] = useState(null);
   
   const dropdownRef = useRef(null);
 
@@ -23,227 +20,212 @@ const DateRangeFilter = ({ selectedDates, onChange }) => {
     return () => document.removeEventListener('mousedown', handleClickOutside);
   }, []);
 
-  const quickOptions = [
-    { label: 'Today', value: 'today' },
-    { label: 'Yesterday', value: 'yesterday' },
-    { label: 'Last 7 Days', value: 'last7days' },
-    { label: 'Last 30 Days', value: 'last30days' },
-    { label: 'This Month', value: 'thisMonth' },
-    { label: 'Last Month', value: 'lastMonth' },
-    { label: 'Custom', value: 'custom' }
-  ];
-
-  const days = Array.from({ length: 31 }, (_, i) => i + 1);
-  const months = [
+  const monthNames = [
     'January', 'February', 'March', 'April', 'May', 'June',
     'July', 'August', 'September', 'October', 'November', 'December'
   ];
+
+  const weekDays = ['S', 'M', 'T', 'W', 'T', 'F', 'S'];
+
+  // Generate years array (current year +10 to -100)
   const currentYear = new Date().getFullYear();
-  const years = Array.from({ length: 100 }, (_, i) => currentYear - i);
+  const years = Array.from({ length: 111 }, (_, i) => currentYear + 10 - i);
 
-  const handleQuickSelect = (value) => {
-    if (value === 'custom') {
-      if (showCustomPicker) {
-        // Closing custom picker
-        setShowCustomPicker(false);
-        setSelectedDay('');
-        setSelectedMonth('');
-        setSelectedYear('');
-        const newQuickSelect = quickSelect.filter(v => v !== 'custom');
-        setQuickSelect(newQuickSelect);
-        updateParent(newQuickSelect, null);
-      } else {
-        // Opening custom picker - DON'T send update yet
-        setShowCustomPicker(true);
-        const newQuickSelect = quickSelect.filter(v => v !== 'custom');
-        setQuickSelect([...newQuickSelect, 'custom']);
-        // DO NOT call updateParent here - wait for date selection
-      }
+  const getDaysInMonth = (date) => {
+    const year = date.getFullYear();
+    const month = date.getMonth();
+    return new Date(year, month + 1, 0).getDate();
+  };
+
+  const getFirstDayOfMonth = (date) => {
+    const year = date.getFullYear();
+    const month = date.getMonth();
+    return new Date(year, month, 1).getDay();
+  };
+
+  const generateCalendarDays = () => {
+    const daysInMonth = getDaysInMonth(currentDate);
+    const firstDay = getFirstDayOfMonth(currentDate);
+    const days = [];
+
+    // Add empty cells for days before month starts
+    for (let i = 0; i < firstDay; i++) {
+      days.push(null);
+    }
+
+    // Add all days of the month
+    for (let day = 1; day <= daysInMonth; day++) {
+      days.push(day);
+    }
+
+    return days;
+  };
+
+  const handlePrevMonth = () => {
+    setCurrentDate(new Date(currentDate.getFullYear(), currentDate.getMonth() - 1));
+  };
+
+  const handleNextMonth = () => {
+    setCurrentDate(new Date(currentDate.getFullYear(), currentDate.getMonth() + 1));
+  };
+
+  const handleDateClick = (day) => {
+    if (!day) return;
+    
+    const selected = new Date(
+      currentDate.getFullYear(),
+      currentDate.getMonth(),
+      day
+    );
+    setSelectedDate(selected);
+  };
+
+  const handleEdit = () => {
+    // Reset to today's month/year when edit is clicked
+    if (selectedDate) {
+      setCurrentDate(new Date(selectedDate));
     } else {
-      // Regular quick select option
-      if (showCustomPicker) {
-        setShowCustomPicker(false);
-        setSelectedDay('');
-        setSelectedMonth('');
-        setSelectedYear('');
-      }
-      
-      const newQuickSelect = quickSelect.filter(v => v !== 'custom');
-      const updatedSelect = newQuickSelect.includes(value)
-        ? newQuickSelect.filter(v => v !== value)
-        : [...newQuickSelect, value];
-      
-      setQuickSelect(updatedSelect);
-      updateParent(updatedSelect, null);
+      setCurrentDate(new Date());
     }
   };
 
-  const updateParent = (quick = quickSelect, customDateOverride = undefined) => {
-    let customDate = customDateOverride !== undefined ? customDateOverride : null;
-    
-    if (customDateOverride === undefined && selectedDay && selectedMonth && selectedYear) {
-      // Format: "day/monthName/year"
-      customDate = `${selectedDay}/${selectedMonth}/${selectedYear}`;
-      console.log('📅 Custom date selected:', customDate);
-    }
-
-    // Filter out 'custom' from quickSelect before sending
-    const filteredQuickSelect = quick.filter(v => v !== 'custom');
-
-    const filterData = { 
-      quickSelect: filteredQuickSelect, 
-      customDate 
-    };
-    
-    console.log('📤 Sending to parent:', filterData);
-    onChange(filterData);
-  };
-
-  const handleCustomDateChange = () => {
-    if (selectedDay && selectedMonth && selectedYear) {
-      // Only update when all three fields are filled
-      updateParent(quickSelect);
-    }
-  };
-
-  const clearAll = () => {
-    setQuickSelect([]);
-    setShowCustomPicker(false);
-    setSelectedDay('');
-    setSelectedMonth('');
-    setSelectedYear('');
+  const handleCancel = () => {
+    setSelectedDate(null);
+    setIsOpen(false);
     onChange({ quickSelect: [], customDate: null });
   };
 
-  const getTotalSelections = () => {
-    let count = quickSelect.filter(v => v !== 'custom').length;
-    if (selectedDay && selectedMonth && selectedYear) {
-      count += 1;
+  const handleOK = () => {
+    if (selectedDate) {
+      onChange({
+        quickSelect: [],
+        customDate: selectedDate.toISOString().split('T')[0]
+      });
     }
-    return count;
+    setIsOpen(false);
+  };
+
+  const isToday = (day) => {
+    const today = new Date();
+    return (
+      day &&
+      currentDate.getFullYear() === today.getFullYear() &&
+      currentDate.getMonth() === today.getMonth() &&
+      day === today.getDate()
+    );
+  };
+
+  const isSelected = (day) => {
+    if (!day || !selectedDate) return false;
+    return (
+      currentDate.getFullYear() === selectedDate.getFullYear() &&
+      currentDate.getMonth() === selectedDate.getMonth() &&
+      day === selectedDate.getDate()
+    );
+  };
+
+  const formatSelectedDate = () => {
+    if (!selectedDate) return 'Select Date';
+    
+    const days = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
+    const months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+    
+    return `${days[selectedDate.getDay()]}, ${months[selectedDate.getMonth()]} ${selectedDate.getDate()}`;
   };
 
   return (
-    <div className="date-range-filter" ref={dropdownRef}>
+    <div className="date-range-filter-modern" ref={dropdownRef}>
       <button 
-        className="filter-trigger"
+        className="filter-trigger-modern"
         onClick={() => setIsOpen(!isOpen)}
       >
-        <span className="filter-title">
-          📅 Date Range
-          {getTotalSelections() > 0 && (
-            <span className="filter-count">{getTotalSelections()}</span>
-          )}
-        </span>
-        <span className={`arrow ${isOpen ? 'open' : ''}`}>▼</span>
+        <span className="calendar-icon">📅</span>
+        <span className="selected-date-text">{formatSelectedDate()}</span>
+        <span className={`arrow-modern ${isOpen ? 'open' : ''}`}>▼</span>
       </button>
 
       {isOpen && (
-        <div className="filter-dropdown date-dropdown">
-          <div className="filter-header">
-            <span className="dropdown-title">Select Date Range</span>
-            {getTotalSelections() > 0 && (
-              <button className="clear-btn" onClick={clearAll}>Clear All</button>
-            )}
+        <div className="calendar-dropdown">
+          <div className="calendar-header">
+            <div className="date-title">SELECT DATE</div>
+            <div className="selected-display">
+              <span>{formatSelectedDate()}</span>
+              {selectedDate && (
+                <button className="edit-icon" onClick={handleEdit} type="button">
+                  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                    <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/>
+                    <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/>
+                  </svg>
+                </button>
+              )}
+            </div>
           </div>
 
-          <div className="date-content">
-            <div className="quick-select-section">
-              <div className="section-title">Quick Select</div>
-              <div className="quick-options">
-                {quickOptions.map((option) => (
-                  <label key={option.value} className="checkbox-label">
-                    <input
-                      type="checkbox"
-                      checked={quickSelect.includes(option.value)}
-                      onChange={() => handleQuickSelect(option.value)}
-                    />
-                    <span className="checkbox-custom"></span>
-                    <span className="option-text">{option.label}</span>
-                  </label>
+          <div className="calendar-body">
+            <div className="month-year-selector">
+              <button className="nav-btn" onClick={handlePrevMonth} type="button">
+                <svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor">
+                  <path d="M15.41 7.41L14 6l-6 6 6 6 1.41-1.41L10.83 12z"/>
+                </svg>
+              </button>
+              
+              <div className="month-year-display">
+                <select 
+                  className="month-select-modern"
+                  value={currentDate.getMonth()}
+                  onChange={(e) => setCurrentDate(new Date(currentDate.getFullYear(), parseInt(e.target.value)))}
+                >
+                  {monthNames.map((month, index) => (
+                    <option key={month} value={index}>{month}</option>
+                  ))}
+                </select>
+                
+                <select
+                  className="year-select-modern"
+                  value={currentDate.getFullYear()}
+                  onChange={(e) => setCurrentDate(new Date(parseInt(e.target.value), currentDate.getMonth()))}
+                >
+                  {years.map(year => (
+                    <option key={year} value={year}>{year}</option>
+                  ))}
+                </select>
+              </div>
+
+              <button className="nav-btn" onClick={handleNextMonth} type="button">
+                <svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor">
+                  <path d="M10 6L8.59 7.41 13.17 12l-4.58 4.59L10 18l6-6z"/>
+                </svg>
+              </button>
+            </div>
+
+            <div className="calendar-grid">
+              <div className="weekdays">
+                {weekDays.map((day) => (
+                  <div key={day} className="weekday">{day}</div>
+                ))}
+              </div>
+
+              <div className="days-grid">
+                {generateCalendarDays().map((day, index) => (
+                  <button
+                    key={index}
+                    type="button"
+                    className={`day-cell ${!day ? 'empty' : ''} ${isToday(day) ? 'today' : ''} ${isSelected(day) ? 'selected' : ''} ${hoveredDate === day ? 'hovered' : ''}`}
+                    onClick={() => handleDateClick(day)}
+                    onMouseEnter={() => setHoveredDate(day)}
+                    onMouseLeave={() => setHoveredDate(null)}
+                    disabled={!day}
+                  >
+                    {day || ''}
+                  </button>
                 ))}
               </div>
             </div>
+          </div>
 
-            {showCustomPicker && (
-              <div className="custom-date-section">
-                <div className="section-title-row">
-                  <div className="section-title">Custom Date</div>
-                  {(selectedDay || selectedMonth || selectedYear) && (
-                    <button 
-                      className="clear-custom-btn" 
-                      onClick={() => {
-                        setSelectedDay('');
-                        setSelectedMonth('');
-                        setSelectedYear('');
-                        updateParent(quickSelect, null);
-                      }}
-                    >
-                      Clear
-                    </button>
-                  )}
-                </div>
-
-                <div className="date-selectors-single">
-                  <select
-                    className="date-select day-select"
-                    value={selectedDay}
-                    onChange={(e) => {
-                      setSelectedDay(e.target.value);
-                      setTimeout(handleCustomDateChange, 0);
-                    }}
-                  >
-                    <option value="">Day</option>
-                    {days.map(day => (
-                      <option key={day} value={day}>{day}</option>
-                    ))}
-                  </select>
-
-                  <select
-                    className="date-select month-select"
-                    value={selectedMonth}
-                    onChange={(e) => {
-                      setSelectedMonth(e.target.value);
-                      setTimeout(handleCustomDateChange, 0);
-                    }}
-                  >
-                    <option value="">Month</option>
-                    {months.map(month => (
-                      <option key={month} value={month}>{month}</option>
-                    ))}
-                  </select>
-
-                  <select
-                    className="date-select year-select"
-                    value={selectedYear}
-                    onChange={(e) => {
-                      setSelectedYear(e.target.value);
-                      setTimeout(handleCustomDateChange, 0);
-                    }}
-                  >
-                    <option value="">Year</option>
-                    {years.map(year => (
-                      <option key={year} value={year}>{year}</option>
-                    ))}
-                  </select>
-                </div>
-
-                {selectedDay && selectedMonth && selectedYear && (
-                  <div className="selected-range">
-                    <strong>Selected:</strong> {selectedDay} {selectedMonth} {selectedYear}
-                  </div>
-                )}
-              </div>
-            )}
-
-            {!showCustomPicker && (
-              <div className="custom-date-section custom-placeholder">
-                <div className="placeholder-content">
-                  <div className="placeholder-icon">📅</div>
-                  <p className="placeholder-text">Select "Custom" to pick a specific date</p>
-                </div>
-              </div>
-            )}
+          <div className="calendar-footer">
+            <button className="cancel-btn" onClick={handleCancel} type="button">Cancel</button>
+            <button className="ok-btn" onClick={handleOK} type="button">OK</button>
           </div>
         </div>
       )}
